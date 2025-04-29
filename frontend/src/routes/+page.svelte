@@ -7,6 +7,13 @@
     // list of cats, show their sightings
     // should colour be enum or free text
     // click on sighting, shows other sightings of same cat highlighted
+    // avg friendliness based on each sighting
+    //
+    // + button for like "i saw a car"
+    //     - ask for location
+    //     - "is it these" local cars (tick box: show all car)
+    //     - if no, add new car + sighting at once
+    //     - if yes, just add new sighting to exsiting car
     import "cesium/Build/Cesium/Widgets/widgets.css";
 
     import { Cartesian3, Ion, Math as CesiumMath, Terrain, Viewer, Cartesian2, Cartographic, SceneMode, ImageryLayer, OpenStreetMapImageryProvider } from "cesium";
@@ -61,12 +68,12 @@
                 canvas.height = viewer.canvas.height;
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
                 for (const c of cats) {
-                    for (const sighting_pos of c.sightings) {
-                        draw_cat(sighting_pos, ctx, viewer);
+                    for (const sighting of c.sightings) {
+                        draw_cat(sighting.pos, ctx, viewer);
                     }
                 }
                 if (info_box_div !== undefined && selected_cat !== undefined && viewer !== undefined) {
-                    const pos = viewer.scene.cartesianToCanvasCoordinates(selected_cat.sightings[0]);
+                    const pos = viewer.scene.cartesianToCanvasCoordinates(selected_cat.sightings[0].pos);
                     info_box_div.style.left = (pos.x + 8).toString() + "px";
                     info_box_div.style.top = (pos.y + 8).toString() + "px";
                 }
@@ -97,10 +104,19 @@
                 viewer.scene.ellipsoid
             );
             if (!cartesian) return; // just ignore an invalid position
-            const cat = new Cat(cartesian);
-            cats.push(cat);
-            selected_cat = cat;
+            show_new_sighting = true;
         }
+    }
+
+    function add_cat() {
+            // const cat: Cat = {
+            //     sightings: [],
+            //     name: "",
+            //     colou
+            // };
+            // cats.push(cat);
+            // selected_cat = cat;
+        
     }
 
     function mouseup(_: MouseEvent) {
@@ -120,31 +136,32 @@
     }
     let canvas: HTMLCanvasElement;
     type CatColour = "Black" | "White";
-    class CatSighting {
+    interface CatSighting {
         pos: Cartesian3;
         who: string; // TODO...
         when: number;
+        image_urls: string[];
     }
-    class Cat {
+    interface Cat {
         sightings: CatSighting[];
         name: string;
         colour: CatColour;
         markings: string | undefined;
         collar: string | undefined;
         description: string;
-        image_urls: string[];
         friendliness: number;
-        constructor(pos: Cartesian3) {
-            this.sightings = [pos];
-            this.name = "The Mysterious Cat of Piss"
-            this.friendliness = 2;
-        }
     }
+
     let selected_cat: Cat | undefined;
     let info_box_div: HTMLDivElement | undefined;
+    let show_new_sighting: boolean = false;
 
     function get_friendliness_desc(friendliness: number): string {
         return ["Runs away", "Keeps a safe distance", "Indifferent", "Curious", "Will approach you"][friendliness - 1];
+    }
+
+    function add_sighting(cat: Cat) {
+        
     }
 </script>
 
@@ -171,6 +188,25 @@
         <p>Description: {selected_cat.description}</p>
         <p>Friendliness: {selected_cat.friendliness} ({get_friendliness_desc(selected_cat.friendliness)})</p>
         <p>Sightings: {selected_cat.sightings.length}</p>
+        <button type="button" on:keypress={(_) => add_sighting(selected_cat as Cat)}>Add sighting</button> <!-- We know selected_cat must not be undefined otherwise this button would be removed -->
+    </div>
+{/if}
+
+{#if show_new_sighting}
+    <div id="error" class="popup centre-window">
+        <h2>New Sighting</h2>
+        <div class="input-container">
+            <p>hi</p>
+            <input/>
+        </div>
+        <div class="input-container">
+            <p>hi</p>
+            <p>hi2</p>
+        </div>
+        <div class="input-container">
+            <p>hi</p>
+            <p>hi2</p>
+        </div>
     </div>
 {/if}
 <svelte:window on:keydown={keypress} on:mousemove|preventDefault={mousemove} />
@@ -182,5 +218,72 @@
         color: #dddddd;
         padding: 6px;
         border-radius: 8px;
+    }
+
+    .centre-window {
+        display: grid;
+        padding: 10px;
+        border-bottom: 3px solid var(--panel-3);
+        background-color: var(--panel-2);
+        border-radius: var(--radius-3);
+        position: absolute;
+        width: max-content;
+        left: 50%;
+        right: 50%;
+        top: 50%;
+        -webkit-transform: translate(-50%, -50%);
+        transform: translate(-50%, -50%);
+    }
+
+    .popup {
+        z-index: 4;
+    }
+
+    .input-container {
+        display: flex;
+        justify-content: center;
+        align-items: stretch;
+        flex-direction: row;
+        margin-bottom: 8px;
+        margin-top: 8px;
+    }
+
+    :root {
+      /* colours */
+      --panel-0: #1e2329;
+      --panel-1: #272e39;
+      --panel-2: #31363F;
+      --panel-3: #3c424f;
+
+      --accent-1-light: #be8fd0;
+      --accent-1-dark: #a776bb;
+
+      --white-1: #d3d3d3;
+
+      --text-dark: #1b0a24;
+      --text-gray: #929292;
+
+      /* radii & margins */
+      /* intended to function well together */
+      /* outer r = inner r + margin */
+      --radius-1: 36px;
+      --margin-1: 20px;
+      --radius-2: 16px;
+      --margin-2: 10px;
+      --radius-3:  6px;
+
+        background-color: var(--panel-0);
+        color: var(--white-1);
+    }
+
+    input, button {
+        border: 1px none;
+        border-radius: var(--radius-3);
+        color: var(--white-1);
+        background-color: var(--panel-1);
+    }
+
+    input:focus {
+        outline: none;
     }
 </style>
