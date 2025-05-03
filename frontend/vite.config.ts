@@ -5,4 +5,7 @@ import { svelte } from '@sveltejs/vite-plugin-svelte'
 export default defineConfig({
   plugins: [svelte()],
   base: "/catmap/",
+  server: {
+    allowedHosts: ["cospox.com", ".cospox.com"],
+  }
 })

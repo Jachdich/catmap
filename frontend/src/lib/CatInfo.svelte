@@ -14,43 +14,69 @@
     function click() {
         dispatch("clicked");
     }
+
+    let fr_str = "Unknown";
+    $: {
+        const fr = cat.friendliness();
+        if (fr !== undefined) {
+            fr_str = `${fr} (${get_friendliness_desc(fr)})`
+        }
+    }
+
+    function more() {
+        
+    }
 </script>
 
-<button type="button" id="info_box" style={border} on:click={click}>
-    <img class="thumb" src={thumb_url} alt="The cat" />
-    <p>{cat.name}</p>
-    <p>Colour: {cat.colour}</p>
-    <p>Distinctive Markings:
-        {#if cat.markings !== undefined}
-            {cat.markings}
-        {:else}
-            <i>None</i>
-        {/if}
-    </p>
-    <p>Collar:
-        {#if cat.collar !== undefined}
-            {cat.collar}
-        {:else}
-            <i>None</i>
-        {/if}
-    </p>
-    <p>Description: {cat.description}</p>
-    <p>Friendliness: {cat.friendliness} ({get_friendliness_desc(cat.friendliness)})</p>
-    <p>Sightings: {cat.sightings.length}</p>
-</button>
+<div id="info-box" style={border}>
+    <div id="info-button" >
+        <img class="thumb" src={thumb_url} alt="The cat" />
+        <a on:click={click} id="alink"><h2>{cat.name}</h2></a>
+        <p>Colour: {cat.colour}</p>
+        <p>Distinctive Markings:
+            {#if cat.markings !== undefined}
+                {cat.markings}
+            {:else}
+                <i>None</i>
+            {/if}
+        </p>
+        <p>Collar:
+            {#if cat.collar !== undefined}
+                {cat.collar}
+            {:else}
+                <i>None</i>
+            {/if}
+        </p>
+        <p>Description: {cat.description}</p>
+        <p>Friendliness: {fr_str}</p>
+        <p>Sightings: {cat.sightings.length}</p>﻿﻿
+    </div>﻿
+    <button type="button" on:click={more}>More</button>
+</div>
 
 <style>
-    #info_box {
+    #info-box {
         background-color: #444444;
         color: #dddddd;
-        padding: 6px;
+    }
+
+    #info-button {
+        background-color: #444444;
+        color: #dddddd;
         text-align: left;
         font-style: normal;
         font-weight: 400;
+        border: none;
+        padding: 0px;
     }
 
     p {
         margin: 4px;
+    }
+
+    #alink {
+        cursor: pointer;
+        text-decoration: underline 2px;
     }
 
     .thumb {

@@ -23,8 +23,9 @@
     import "leaflet/dist/leaflet.css";
     import { onMount } from "svelte";
     import CatInfo from "./lib/CatInfo.svelte";
+    import CatProfile from "./lib/CatProfile.svelte";
     import { CatSighting, Cat } from "./lib/cat";
-    import { cat_icon_sel } from "./lib/icons";
+    import "./lib/popup.css";
 
     let cats: Cat[] = [];
     let mymap: Map | undefined;
@@ -34,6 +35,7 @@
             zoom: 16
         };
         mymap = map("map", options);
+        mymap.addEventListener("click", () => { cats.map((c) => c.deselect_all()); cats = cats; });
         cats = [
             new Cat({
                 id: 0,
@@ -42,19 +44,22 @@
                 markings: undefined,
                 collar: "says CAT",
                 description: "Nice cat seen near null island",
-                friendliness: 4,
                 sightings: [
                     new CatSighting({
                         pos: latLng(55.94170394241303, -3.1952485473196126),
                         who: "martyna",
                         when: 1745888711.9800618,
-                        image_urls: ["/catmap/th-2346172708.jpeg"]
+                        image_urls: ["/catmap/th-2346172708.jpeg"],
+                        notes: undefined,
+                        friendliness: 4,
                     }, mymap),
                     new CatSighting({
                         pos: latLng(55.94270394241303, -3.1852485473196126),
                         who: "martyna",
                         when: 1745880711.9800618,
-                        image_urls: ["/catmap/th-2102865096.jpeg", "/catmap/th-2600831414.jpeg", "/catmap/th-448461832.jpeg", "/catmap/th-4145515264.jpeg", "/catmap/th-551657236.jpeg"]
+                        image_urls: ["/catmap/th-2102865096.jpeg", "/catmap/th-2600831414.jpeg", "/catmap/th-448461832.jpeg", "/catmap/th-4145515264.jpeg", "/catmap/th-551657236.jpeg"],
+                        notes: undefined,
+                        friendliness: 4,
                     }, mymap),
                 ]
             }),
@@ -65,13 +70,14 @@
                 markings: "black splodge underside",
                 collar: undefined,
                 description: "a bit scaredy",
-                friendliness: 2,
                 sightings: [
                     new CatSighting({
                         pos: latLng(55.94180394241303, -3.1952285473196126),
                         who: "james",
                         when: 1745889711.9800618,
-                        image_urls: []
+                        image_urls: [],
+                        notes: undefined,
+                        friendliness: 2,
                     }, mymap),
                 ]
             })
@@ -97,16 +103,13 @@
 
     function select_cat(cat: Cat) {
         for (const c of cats) {
-            c.selected = false;
             c.deselect_all();
         }
-        for (const s of cat.sightings) {
-            s.marker.setIcon(cat_icon_sel);
-        }
-        cat.selected = true;
+        cat.select_all();
         cats = cats;
-        
     }
+
+    let more_info: Cat | undefined = undefined;
     
 </script>
 
@@ -137,6 +140,10 @@
     </div>
 {/if}
 
+{#if more_info !== undefined}
+    <CatProfile cat={more_info} />
+{/if}
+
 <style>
     #root {
         display: flex;
@@ -161,25 +168,6 @@
         width: 100%;
         margin-top: auto;
     }
-    .centre-window {
-        display: grid;
-        padding: 10px;
-        border-bottom: 3px solid var(--panel-3);
-        background-color: var(--panel-2);
-        border-radius: var(--radius-3);
-        position: absolute;
-        width: max-content;
-        left: 50%;
-        right: 50%;
-        top: 50%;
-        -webkit-transform: translate(-50%, -50%);
-        transform: translate(-50%, -50%);
-    }
-
-    .popup {
-        z-index: 4;
-    }
-
     .input-container {
         display: flex;
         justify-content: center;

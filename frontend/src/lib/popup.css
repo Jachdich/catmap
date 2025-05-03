@@ -1,0 +1,20 @@
+
+.centre-window {
+    display: grid;
+    padding: 10px;
+    border-bottom: 3px solid var(--panel-3);
+    background-color: var(--panel-2);
+    border-radius: var(--radius-3);
+    position: absolute;
+    width: max-content;
+    left: 50%;
+    right: 50%;
+    top: 50%;
+    -webkit-transform: translate(-50%, -50%);
+    transform: translate(-50%, -50%);
+}
+
+.popup {
+    z-index: 4;
+}
+
