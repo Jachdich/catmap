@@ -19,15 +19,16 @@
     // TODO code
     // switch to own OSM tile source (or, realistically in the short term, credit the one I am using)
 
-    import { map, latLng, tileLayer, marker, type MapOptions, Map, icon, Icon, Marker } from "leaflet";
+    import { map, latLng, tileLayer, type MapOptions, Map, Util } from "leaflet";
     import "leaflet/dist/leaflet.css";
-    import { onMount } from "svelte";
+    import { onMount, tick } from "svelte";
     import CatInfo from "./lib/CatInfo.svelte";
     import CatProfile from "./lib/CatProfile.svelte";
+    import SightingImages from "./lib/SightingImages.svelte";
     import { CatSighting, Cat } from "./lib/cat";
     import "./lib/popup.css";
 
-    let cats: Cat[] = [];
+    let cats: Cat[] = $state([]);
     let mymap: Map | undefined;
     onMount(() => {
         const options: MapOptions = {
@@ -35,7 +36,7 @@
             zoom: 16
         };
         mymap = map("map", options);
-        mymap.addEventListener("click", () => { cats.map((c) => c.deselect_all()); cats = cats; });
+        mymap.addEventListener("click", () => { cats.map((c) => c.deselect_all()); cats = cats; selected_cat = undefined; });
         cats = [
             new Cat({
                 id: 0,
@@ -94,9 +95,24 @@
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(mymap);
 
+
+        // mymap.addEventListener("move", update_image_positions);
+        // mymap.addEventListener("update", update_image_positions);
+        // Util.requestAnimFrame((_) => update_image_positions());
+
     });
 
-    let add_cat = false;
+    // function update_image_positions() {
+    //     if (mymap === undefined) return;
+    //     for (let i = 0; i < selected_sightings.length; i++) {
+    //         let ss_pos = mymap.latLngToContainerPoint(selected_sightings[i].pos);
+    //         positions[i] = [ss_pos.x, ss_pos.y];
+    //     }
+    //     positions = positions;
+    //     Util.requestAnimFrame((_) => update_image_positions());
+    // }
+
+    let add_cat = $state(false);
     function add_cat_button() {
         add_cat = true;
     }
@@ -107,114 +123,137 @@
         }
         cat.select_all();
         cats = cats;
+        selected_cat = cat;
     }
 
-    let more_info: Cat | undefined = undefined;
-    
+    let more_info: Cat | undefined = $state(undefined);
+    let selected_cat: Cat | undefined = $state(undefined);
+    let selected_sightings: CatSighting[] = $state([]);
+    let positions: [number, number][] = $state([]);
+    $effect(() => {
+        if (selected_cat === undefined) {
+            selected_sightings = [];
+        } else {
+            selected_sightings = selected_cat.sightings;
+        }
+    });
+
+    $effect(() => { positions = selected_sightings.map((s) => s.ss_pos); });
 </script>
 
 <div id="root">
-    <div id="map"></div>
-    <div id="cat-list">
-        {#each cats as cat}
-            <CatInfo {cat} on:clicked={() => select_cat(cat)} />
-        {/each}
-        <button id="add-cat-button" on:click={add_cat_button}>Add cat</button>
-    </div>
+  <div id="map"></div>
+  <div id="cat-list">
+    {#each cats as cat}
+      <CatInfo
+        {cat}
+        clicked={() => select_cat(cat)}
+        showmore={() => (more_info = cat)}
+      />
+    {/each}
+    <button id="add-cat-button" onclick={add_cat_button}>Add cat</button>
+  </div>
 </div>
+
+<!--
+{#each selected_sightings as s, i}
+  <SightingImages sighting={s} pos={positions[i]} />
+{/each}
+-->
+
 {#if add_cat}
-    <div id="error" class="popup centre-window">
-        <h2>New Sighting</h2>
-        <div class="input-container">
-            <p>hi</p>
-            <input />
-        </div>
-        <div class="input-container">
-            <p>hi</p>
-            <p>hi2</p>
-        </div>
-        <div class="input-container">
-            <p>hi</p>
-            <p>hi2</p>
-        </div>
+  <div id="error" class="popup centre-window">
+    <h2>New Sighting</h2>
+    <div class="input-container">
+      <p>hi</p>
+      <input />
     </div>
+    <div class="input-container">
+      <p>hi</p>
+      <p>hi2</p>
+    </div>
+    <div class="input-container">
+      <p>hi</p>
+      <p>hi2</p>
+    </div>
+  </div>
 {/if}
 
 {#if more_info !== undefined}
-    <CatProfile cat={more_info} />
+  <CatProfile cat={more_info} />
 {/if}
 
 <style>
-    #root {
-        display: flex;
-        flex-direction: row;
-        position: absolute;
-        width: 100%;
-        height: 100%;
-    }
-    #map {
-        width: 100%;
-        height: 100%;
-        z-index: 1;
-    }
-    #cat-list {
-        width: 400px;
-        display: flex;
-        flex-direction: column;
-        height: 100%;
-        gap: 8px;
-    }
-    #add-cat-button {
-        width: 100%;
-        margin-top: auto;
-    }
-    .input-container {
-        display: flex;
-        justify-content: center;
-        align-items: stretch;
-        flex-direction: row;
-        margin-bottom: 8px;
-        margin-top: 8px;
-    }
+  #root {
+    display: flex;
+    flex-direction: row;
+    position: absolute;
+    width: 100%;
+    height: 100%;
+  }
+  #map {
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+  }
+  #cat-list {
+    width: 400px;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    gap: 8px;
+  }
+  #add-cat-button {
+    width: 100%;
+    margin-top: auto;
+  }
+  .input-container {
+    display: flex;
+    justify-content: center;
+    align-items: stretch;
+    flex-direction: row;
+    margin-bottom: 8px;
+    margin-top: 8px;
+  }
 
-    :root {
-        /* colours */
-        --panel-0: #1e2329;
-        --panel-1: #272e39;
-        --panel-2: #31363f;
-        --panel-3: #3c424f;
+  :root {
+    /* colours */
+    --panel-0: #1e2329;
+    --panel-1: #272e39;
+    --panel-2: #31363f;
+    --panel-3: #3c424f;
 
-        --accent-1-light: #be8fd0;
-        --accent-1-dark: #a776bb;
+    --accent-1-light: #be8fd0;
+    --accent-1-dark: #a776bb;
 
-        --white-1: #d3d3d3;
+    --white-1: #d3d3d3;
 
-        --text-dark: #1b0a24;
-        --text-gray: #929292;
+    --text-dark: #1b0a24;
+    --text-gray: #929292;
 
-        /* radii & margins */
-        /* intended to function well together */
-        /* outer r = inner r + margin */
-        --radius-1: 36px;
-        --margin-1: 20px;
-        --radius-2: 16px;
-        --margin-2: 10px;
-        --radius-3: 6px;
+    /* radii & margins */
+    /* intended to function well together */
+    /* outer r = inner r + margin */
+    --radius-1: 36px;
+    --margin-1: 20px;
+    --radius-2: 16px;
+    --margin-2: 10px;
+    --radius-3: 6px;
 
-        background-color: var(--panel-0);
-        font-family: sans-serif;
-        color: var(--white-1);
-    }
+    background-color: var(--panel-0);
+    font-family: sans-serif;
+    color: var(--white-1);
+  }
 
-    input,
-    button {
-        border: 1px none;
-        border-radius: var(--radius-3);
-        color: var(--white-1);
-        background-color: var(--panel-1);
-    }
+  input,
+  button {
+    border: 1px none;
+    border-radius: var(--radius-3);
+    color: var(--white-1);
+    background-color: var(--panel-1);
+  }
 
-    input:focus {
-        outline: none;
-    }
+  input:focus {
+    outline: none;
+  }
 </style>

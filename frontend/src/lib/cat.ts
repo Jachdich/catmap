@@ -1,4 +1,4 @@
-import { LatLng, marker, Marker, Map } from "leaflet";
+import { LatLng, marker, Marker, Map, Popup } from "leaflet";
 import { cat_icon, cat_icon_sel } from "./icons";
 import { tick } from "svelte";
 
@@ -11,6 +11,8 @@ export class CatSighting {
     notes: string | undefined;
     image_urls: string[];
     marker: Marker;
+    img_display_elem:HTMLDivElement | undefined;
+    ss_pos: [number, number] = [0, 0];
 
     constructor(data: {
         pos: LatLng;
@@ -28,6 +30,14 @@ export class CatSighting {
         this.notes = data.notes;
 
         this.marker = marker(this.pos, {icon: cat_icon});
+        let content = '<div style="display: flex; flex-direction: column;">';
+        for (const url of this.image_urls) {
+            content += "<img src='" + url + "' style='width: 64px'/>";
+        }
+        content += "</div>"
+        let p = new Popup().setContent(content);
+        p.options.autoClose = false;
+        this.marker.bindPopup(p);
         this.marker.addTo(map);
     }
 }
@@ -64,12 +74,14 @@ export class Cat {
     select_all() {
         for (const s of this.sightings) {
             s.marker.setIcon(cat_icon_sel);
+            s.marker.openPopup();
         }
         this.selected = true;
     }
     deselect_all() {
         for (const s of this.sightings) {
             s.marker.setIcon(cat_icon);
+            s.marker.closePopup();
         }
         this.selected = false;
     }
