@@ -8,22 +8,11 @@
     }
     let { cat, clicked, showmore }: Props = $props();
 
-    function get_friendliness_desc(friendliness: number): string {
-        return ["Runs away", "Keeps a safe distance", "Indifferent", "Curious", "Will approach you"][friendliness - 1];
-    }
     let border = $derived(cat.selected ? "border: 2px solid white;" : "border: 2px solid #444444;");
     let thumb_url = $derived(cat.sightings[0].image_urls.length > 0 ? cat.sightings[0].image_urls[0] : "/catmap/catmeow.png");
     function click() {
         clicked();
     }
-
-    let fr_str = $state("Unknown");
-    $effect(() => {
-        const fr = cat.friendliness();
-        if (fr !== undefined) {
-            fr_str = `${fr} (${get_friendliness_desc(fr)})`
-        }
-    });
 
     function more() {
         showmore();
@@ -50,7 +39,7 @@
             {/if}
         </p>
         <p>Description: {cat.description}</p>
-        <p>Friendliness: {fr_str}</p>
+        <p>Friendliness: {cat.friendliness() === undefined ? "Unknown" : `${cat.friendliness()} (${cat.friendliness_desc()})`}</p>
         <p>Sightings: {cat.sightings.length}</p>﻿﻿
     </div>﻿
     <button type="button" onclick={more}>More</button>

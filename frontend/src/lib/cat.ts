@@ -92,4 +92,11 @@ export class Cat {
         fs.sort();
         return fs[Math.floor(fs.length / 2)];
     }
+    friendliness_desc(): string | undefined {
+        const friendliness = this.friendliness();
+        if (friendliness === undefined) {
+            return;
+        }
+        return ["Runs away", "Keeps a safe distance", "Indifferent", "Curious", "Will approach you"][friendliness - 1];
+    }
 }

@@ -1,0 +1,6 @@
+button {
+        color: var(--white-1);
+        background-color: var(--panel-3);
+        border: 1px solid var(--text-gray);
+        border-radius: 4px;
+}

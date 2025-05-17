@@ -180,7 +180,7 @@
 {/if}
 
 {#if more_info !== undefined}
-  <CatProfile cat={more_info} />
+  <CatProfile cat={more_info} close={() => more_info = undefined} />
 {/if}
 
 <style>
