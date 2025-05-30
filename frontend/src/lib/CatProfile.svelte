@@ -1,5 +1,6 @@
 <script lang="ts">
     import { type Cat } from "./cat";
+    import MaybeNoneEditable from "./MaybeNoneEditable.svelte";
     import "./popup.css";
     interface Props {
         cat: Cat;
@@ -7,11 +8,6 @@
     }
     let { cat, close } : Props = $props();
     let editing = $state(false);
-    function change(ev: InputEvent) {
-        console.log(ev);
-        cat.markings = ev.data === null ? undefined : ev.target.innerText;
-        console.log(cat.markings);
-    }
 </script>
 
 <div id="main" class="popup centre-window">
@@ -20,29 +16,17 @@
         <div id="left-content">
             <h1>{cat.name}</h1>
             <h2>Colour</h2>
-            <p contenteditable={editing}>{cat.colour}</p>
+            <MaybeNoneEditable editing={editing} val={cat.colour} />
             <h2>Distinctive Markings</h2>
-            <p contenteditable={editing} oninput={change}>
-                {#if cat.markings !== undefined}
-                    {cat.markings}
-                {:else}
-                    <i>None</i>
-                {/if}
-            </p>
+            <MaybeNoneEditable editing={editing} val={cat.markings} />
             <h2>Collar</h2>
-            <p contenteditable={editing}>
-                {#if cat.collar !== undefined}
-                    {cat.collar}
-                {:else}
-                    <i>None</i>
-                {/if}
-            </p>
+            <MaybeNoneEditable editing={editing} val={cat.collar} />
             <h2>Description</h2>
-            <p contenteditable={editing}>{cat.description}</p>
+            <MaybeNoneEditable editing={editing} val={cat.description} />
             <h2>Friendliness</h2>
             <p>{cat.friendliness() === undefined ? "Unknown" : `${cat.friendliness()} (${cat.friendliness_desc()})`}</p>
 
-            <button onclick={() => editing = true}>Edit</button>
+            <button onclick={() => editing = !editing}>Edit</button>
         </div>
         <div id="right-content">
             {#each cat.sightings as s}
@@ -95,7 +79,7 @@
         margin: 0px;
         width: 100%;
         padding: 4px;
-        background-color: var(--panel-1);
+        background-color: var(--panel-3);
         -webkit-box-sizing: border-box;
         -moz-box-sizing: border-box;
         -ms-box-sizing: border-box;
