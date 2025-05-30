@@ -4,27 +4,40 @@
         val: string | undefined,
     }
     let {editing, val}: Props = $props();
+
+    $effect(() => {
+        if (val === "") {
+            val = undefined;
+        }
+    });
+
+    $effect(() => {
+        if (editing) resize();
+    })
+
+    let textarea: HTMLTextAreaElement | undefined = $state();
+
+    function resize() {
+        if (!textarea) return;
+        textarea.style.height = "auto";
+        textarea.style.height = textarea.scrollHeight + 2 + "px";
+    }
 </script>
 
-
 {#if editing}
-    {#if val !== undefined}
-        <input type="text" bind:value={val}/>
-    {:else}
-        <input type="text" placeholder="None" bind:value={val}/>
-    {/if}
+    <textarea placeholder="None" bind:value={val} rows="1" oninput={resize} bind:this={textarea}></textarea>
 {:else}
-    <p>
+    <div id="textarea">
         {#if val !== undefined}
             {val}
         {:else}
             <i>None</i>
         {/if}
-    </p>
+    </div>
 {/if}
 
 <style>
-    p {
+    #textarea {
         margin: 0px;
         width: 100%;
         padding: 4px;
@@ -33,17 +46,22 @@
         -moz-box-sizing: border-box;
         -ms-box-sizing: border-box;
         box-sizing: border-box;
+        white-space: pre-wrap;
     }
 
-    input {
+    textarea {
+        font-family: inherit;
+        font-size: inherit;
         background-color: var(--panel-1);
         color: var(--white-1);
         border: 1px solid var(--accent-1-dark);
         border-radius: 2px;
-        font-size: 16px;
         width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
+        overflow-y: hidden;
     }
-    input:focus {
+    textarea:focus {
         outline: none;
         border-color: var(--accent-1-light);
     }

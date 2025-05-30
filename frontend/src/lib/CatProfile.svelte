@@ -63,6 +63,8 @@
         width: 50%;
         min-width: 50%;
         padding-right: 5px;
+        overflow-y: scroll;
+        scrollbar-gutter: auto;
     }
 
     #right-content {
@@ -72,7 +74,7 @@
     }
 
     #sighting-image {
-        width: 100%;
+        width: 50%;
     }
 
     p {
