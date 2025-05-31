@@ -28,6 +28,7 @@
     import { CatSighting, Cat } from "./lib/cat";
     import "./lib/popup.css";
     import { cat_icon_sel } from "./lib/icons";
+    import MaybeNoneEditable from "./lib/MaybeNoneEditable.svelte";
 
     let cats: Cat[] = $state([]);
     let mymap: Map | undefined;
@@ -65,7 +66,7 @@
                     new CatSighting({
                         pos: latLng(55.94170394241303, -3.1952485473196126),
                         who: "martyna",
-                        when: 1745888711.9800618,
+                        when: new Date(1745888711.9800618),
                         image_urls: ["/catmap/th-2346172708.jpeg"],
                         notes: undefined,
                         friendliness: 4,
@@ -73,7 +74,7 @@
                     new CatSighting({
                         pos: latLng(55.94270394241303, -3.1852485473196126),
                         who: "martyna",
-                        when: 1745880711.9800618,
+                        when: new Date(1745880711.9800618),
                         image_urls: ["/catmap/th-2102865096.jpeg", "/catmap/th-2600831414.jpeg", "/catmap/th-448461832.jpeg", "/catmap/th-4145515264.jpeg", "/catmap/th-551657236.jpeg"],
                         notes: undefined,
                         friendliness: 4,
@@ -91,7 +92,7 @@
                     new CatSighting({
                         pos: latLng(55.94180394241303, -3.1952285473196126),
                         who: "james",
-                        when: 1745889711.9800618,
+                        when: new Date(1745889711.9800618),
                         image_urls: [],
                         notes: undefined,
                         friendliness: 2,
@@ -127,11 +128,12 @@
     //     positions = positions;
     //     Util.requestAnimFrame((_) => update_image_positions());
     // }
-    type AddState = "Not" | "Position" | "CheckNearby" | "AddSighting" | "AddCat";
+    type AddState = "Not" | "Position" | "CheckNearby" | "AddSighting" | "NewCat";
     let add_cat: AddState = $state("Not");
     let add_cat_pos: LatLng | undefined = $state(undefined);
     let add_cat_popup: Marker | undefined = undefined;
     let nearby_cats: Cat[] = $state([]);
+    let new_cat: Cat | undefined = $state(undefined);
     function add_cat_button() {
         add_cat = "Position";
     }
@@ -158,6 +160,42 @@
             add_cat_popup.remove();
             add_cat_popup = undefined;
         }
+    }
+
+    function add_new_cat() {
+        if (!mymap) return;
+        add_cat = "NewCat";
+        new_cat = new Cat({
+        id: cats[cats.length - 1].id,
+            sightings: [
+                new CatSighting({
+                    pos: add_cat_pos as LatLng, // Should exist by now
+                    who: undefined,
+                    when: new Date(),
+                    image_urls: [],
+                    friendliness: undefined,
+                    notes: undefined}, mymap
+                ),
+            ],
+            name: "",
+            colour: "",
+            markings: undefined,
+            collar: undefined,
+            description: "",
+           
+        });
+    }
+
+    function validate_friendliness(a: HTMLInputElement) {
+        a.value = a.value.replace(/[^0-9]/g, '');
+        if (a.value != "" && Number.parseInt(a.value) > 5) {
+            a.value = "5";
+        }
+        if (a.value != "" && Number.parseInt(a.value) < 1) {
+            a.value = "1";
+        }
+        if (new_cat !== undefined)
+            new_cat.sightings[0].friendliness = Number.parseInt(a.value);
     }
 
     function select_cat(cat: Cat) {
@@ -220,14 +258,37 @@
       <h2 id="title">Are any of these your car?</h2>
       <p id="subtitle">Check nearby cats in case your cat has already been seen</p>
       {#each nearby_cats as cat}
-        <CatInfo {cat} clicked={function() {}} showmore={function() {}}/> 
+        <CatInfo {cat} clicked={function() {}} showmore={() => {more_info = cat}}/> 
       {/each}
     </div>
     <div id="bottom-buttons">
-      <button type="button" class="button-expand-width">New cat</button>
+      <button type="button" class="button-expand-width" onclick={add_new_cat}>New cat</button>
       <button type="button" class="button-expand-width" onclick={cancel_add_cat}>Cancel</button>
     </div>
   </div>
+{/if}
+
+{#if add_cat == "NewCat" && new_cat !== undefined}
+    <div id="new-cat" class="popup centre-window">
+        <h2>Name</h2>
+        <MaybeNoneEditable editing={true} val={new_cat.name} />
+        <h2>Colour</h2>
+        <MaybeNoneEditable editing={true} val={new_cat.colour} />
+        <h2>Distinctive Markings</h2>
+        <MaybeNoneEditable editing={true} val={new_cat.markings} />
+        <h2>Collar</h2>
+        <MaybeNoneEditable editing={true} val={new_cat.collar} />
+        <h2>Description</h2>
+        <MaybeNoneEditable editing={true} val={new_cat.description} />
+        <h2>Friendliness</h2>
+        <input oninput={(e) => validate_friendliness(e.currentTarget)} />
+        <h2>Date seen</h2>
+        <input type="date" value={new_cat.sightings[0].when} />
+        <h2>Sighting notes</h2>
+        <MaybeNoneEditable editing={true} val={new_cat.sightings[0].notes} />
+        <h2>Pictures</h2>
+        <input type="file" multiple />
+    </div>
 {/if}
 
 {#if more_info !== undefined}
@@ -235,6 +296,12 @@
 {/if}
 
 <style>
+
+  #new-cat {
+    display: flex;
+    flex-direction: column;
+  }
+    
   #title {
     margin-bottom: 0px;
   }

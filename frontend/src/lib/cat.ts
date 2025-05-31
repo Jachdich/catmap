@@ -2,11 +2,10 @@ import { LatLng, marker, Marker, Map, Popup } from "leaflet";
 import { cat_icon, cat_icon_sel } from "./icons";
 import { tick } from "svelte";
 
-type CatColour = "Black" | "White";
 export class CatSighting {
     pos: LatLng;
     who: string | undefined;
-    when: number;
+    when: Date;
     friendliness: number | undefined;
     notes: string | undefined;
     image_urls: string[];
@@ -17,7 +16,7 @@ export class CatSighting {
     constructor(data: {
         pos: LatLng;
         who: string | undefined;
-        when: number;
+        when: Date;
         image_urls: string[];
         friendliness: number | undefined;
         notes: string | undefined;
@@ -48,7 +47,7 @@ export class Cat {
     id: number;
     sightings: CatSighting[];
     name: string; // first person to see the cat names it, no editing 
-    colour: CatColour;
+    colour: string;
     markings: string | undefined;
     collar: string | undefined;
     description: string;
@@ -58,7 +57,7 @@ export class Cat {
         id: number;
         sightings: CatSighting[];
         name: string;
-        colour: CatColour;
+        colour: string;
         markings: string | undefined;
         collar: string | undefined;
         description: string;
