@@ -37,6 +37,7 @@ export class CatSighting {
         content += "</div>"
         let p = new Popup().setContent(content);
         p.options.autoClose = false;
+        p.options.autoPan = false;
         this.marker.bindPopup(p);
         this.marker.addTo(map);
     }
@@ -52,6 +53,7 @@ export class Cat {
     collar: string | undefined;
     description: string;
     selected: boolean = false;
+    best_image: [number, number] | undefined;
     constructor(data: {
         id: number;
         sightings: CatSighting[];
@@ -68,7 +70,18 @@ export class Cat {
         this.markings = data.markings; 
         this.collar = data.collar; 
         this.description = data.description; 
-        // this.friendliness = data.friendliness;
+        this.best_image = undefined;
+
+        // TODO temp
+        if (this.sightings.length > 0 && this.sightings[0].image_urls.length > 0) {
+            this.best_image = [0, 0];
+        }
+    }
+
+    get_best_image_url(): string | undefined {
+        if (!this.best_image)
+            return undefined;
+        return this.sightings[this.best_image[0]].image_urls[this.best_image[1]];
     }
 
     select_all() {

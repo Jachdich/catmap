@@ -9,7 +9,8 @@
     let { cat, clicked, showmore }: Props = $props();
 
     let border = $derived(cat.selected ? "border: 2px solid white;" : "border: 2px solid #444444;");
-    let thumb_url = $derived(cat.sightings[0].image_urls.length > 0 ? cat.sightings[0].image_urls[0] : "/catmap/catmeow.png");
+    $effect(() => console.log(cat.selected));
+    let thumb_url: string = $derived(cat.get_best_image_url() ?? "/catmap/catmeow.png");
     function click() {
         clicked();
     }

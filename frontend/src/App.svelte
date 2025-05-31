@@ -19,7 +19,7 @@
     // TODO code
     // switch to own OSM tile source (or, realistically in the short term, credit the one I am using)
 
-    import { map, latLng, tileLayer, type MapOptions, Map, Util } from "leaflet";
+    import { map, latLng, tileLayer, type MapOptions, Map, Util, type LeafletMouseEvent, LatLng, Popup, marker, Marker } from "leaflet";
     import "leaflet/dist/leaflet.css";
     import { onMount, tick } from "svelte";
     import CatInfo from "./lib/CatInfo.svelte";
@@ -27,6 +27,7 @@
     import SightingImages from "./lib/SightingImages.svelte";
     import { CatSighting, Cat } from "./lib/cat";
     import "./lib/popup.css";
+    import { cat_icon_sel } from "./lib/icons";
 
     let cats: Cat[] = $state([]);
     let mymap: Map | undefined;
@@ -36,7 +37,22 @@
             zoom: 16
         };
         mymap = map("map", options);
-        mymap.addEventListener("click", () => { cats.map((c) => c.deselect_all()); cats = cats; selected_cat = undefined; });
+        mymap.addEventListener("click", (e: LeafletMouseEvent) => {
+            if (selected_cat !== undefined) {
+                cats.map((c) => c.deselect_all());
+                cats = cats;
+                selected_cat = undefined;
+            }
+            if (add_cat == "Position") {
+                if (mymap === undefined) return;
+                if (add_cat_popup !== undefined) {
+                    add_cat_popup.remove();
+                }
+                add_cat_pos = e.latlng;
+                add_cat_popup = marker(add_cat_pos, {icon: cat_icon_sel});
+                add_cat_popup.addTo(mymap);
+            }
+        });
         cats = [
             new Cat({
                 id: 0,
@@ -111,10 +127,37 @@
     //     positions = positions;
     //     Util.requestAnimFrame((_) => update_image_positions());
     // }
-
-    let add_cat = $state(false);
+    type AddState = "Not" | "Position" | "CheckNearby" | "AddSighting" | "AddCat";
+    let add_cat: AddState = $state("Not");
+    let add_cat_pos: LatLng | undefined = $state(undefined);
+    let add_cat_popup: Marker | undefined = undefined;
+    let nearby_cats: Cat[] = $state([]);
     function add_cat_button() {
-        add_cat = true;
+        add_cat = "Position";
+    }
+
+    function add_cat_selected_position() {
+        add_cat = "CheckNearby";
+        const pos = add_cat_pos as LatLng; // We know it must be not undefined
+        nearby_cats = [];
+        for (const cat of cats) {
+            for (const sighting of cat.sightings) {
+                if (sighting.pos.distanceTo(pos) < 1000) {
+                    nearby_cats.push(cat);
+                    break;
+                }
+            }
+        }
+    }
+
+    function cancel_add_cat() {
+        add_cat = "Not";
+        nearby_cats = [];
+        add_cat_pos = undefined;
+        if (add_cat_popup !== undefined) {
+            add_cat_popup.remove();
+            add_cat_popup = undefined;
+        }
     }
 
     function select_cat(cat: Cat) {
@@ -143,15 +186,17 @@
 
 <div id="root">
   <div id="map"></div>
-  <div id="cat-list">
-    {#each cats as cat}
-      <CatInfo
-        {cat}
-        clicked={() => select_cat(cat)}
-        showmore={() => (more_info = cat)}
-      />
-    {/each}
-    <button id="add-cat-button" onclick={add_cat_button}>Add cat</button>
+  <div id="right-bar">
+    <div id="cat-list">
+      {#each cats as cat}
+        <CatInfo
+          {cat}
+          clicked={() => select_cat(cat)}
+          showmore={() => (more_info = cat)}
+        />
+      {/each}
+    </div>
+    <button id="add-cat-button" onclick={add_cat_button} disabled={add_cat != "Not"}>Add cat</button>
   </div>
 </div>
 
@@ -161,20 +206,26 @@
 {/each}
 -->
 
-{#if add_cat}
-  <div id="error" class="popup centre-window">
-    <h2>New Sighting</h2>
-    <div class="input-container">
-      <p>hi</p>
-      <input />
+{#if add_cat == "Position"}
+  <div id="catpos">
+      <p>Select a position</p>
+      <button type="button" class="position-done-button" disabled={add_cat_pos === undefined} onclick={add_cat_selected_position}>Done</button>
+      <button type="button" class="position-done-button" onclick={cancel_add_cat}>Cancel</button>
+  </div>
+{/if}
+
+{#if add_cat == "CheckNearby"}
+  <div id="is-this-ur-car" class="popup centre-window">
+    <div id="ur-car-scroll">
+      <h2 id="title">Are any of these your car?</h2>
+      <p id="subtitle">Check nearby cats in case your cat has already been seen</p>
+      {#each nearby_cats as cat}
+        <CatInfo {cat} clicked={function() {}} showmore={function() {}}/> 
+      {/each}
     </div>
-    <div class="input-container">
-      <p>hi</p>
-      <p>hi2</p>
-    </div>
-    <div class="input-container">
-      <p>hi</p>
-      <p>hi2</p>
+    <div id="bottom-buttons">
+      <button type="button" class="button-expand-width">New cat</button>
+      <button type="button" class="button-expand-width" onclick={cancel_add_cat}>Cancel</button>
     </div>
   </div>
 {/if}
@@ -184,6 +235,39 @@
 {/if}
 
 <style>
+  #title {
+    margin-bottom: 0px;
+  }
+  #subtitle {
+    margin-top: 0px;
+  }
+  #ur-car-scroll {
+    overflow-y: scroll;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    background-color: inherit;
+  }
+  #is-this-ur-car {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    height: 80%;
+    width: 80%;
+    background-color: var(--panel-0);
+    border: 2px solid var(--panel-2);
+  }
+  #bottom-buttons {
+    display: flex;
+    flex-direction: row;
+    margin-top: auto;
+  }
+  .button-expand-width {
+    flex-grow: 1;
+    margin-left: 4px;
+    margin-right: 4px;
+  }
+
   #root {
     display: flex;
     flex-direction: row;
@@ -196,15 +280,22 @@
     height: 100%;
     z-index: 1;
   }
-  #cat-list {
+  #right-bar {
     width: 400px;
     display: flex;
     flex-direction: column;
     height: 100%;
+    gap: 4px;
+  }
+  #cat-list {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
     gap: 8px;
+    overflow-y: scroll;
   }
   #add-cat-button {
-    width: 100%;
+    margin: 4px;
     margin-top: auto;
   }
   .input-container {
@@ -216,44 +307,26 @@
     margin-top: 8px;
   }
 
-  :root {
-    /* colours */
-    --panel-0: #1e2329;
-    --panel-1: #272e39;
-    --panel-2: #31363f;
-    --panel-3: #3c424f;
-
-    --accent-1-light: #be8fd0;
-    --accent-1-dark: #a776bb;
-
-    --white-1: #d3d3d3;
-
-    --text-dark: #1b0a24;
-    --text-gray: #929292;
-
-    /* radii & margins */
-    /* intended to function well together */
-    /* outer r = inner r + margin */
-    --radius-1: 36px;
-    --margin-1: 20px;
-    --radius-2: 16px;
-    --margin-2: 10px;
-    --radius-3: 6px;
-
+  #catpos {
+    z-index: 9;
+    position: absolute;
+    top: 16px;
+    left: 50%;
+    transform: translate(-50%, 0);
     background-color: var(--panel-0);
-    font-family: sans-serif;
-    color: var(--white-1);
+    display: flex;
+    flex-direction: row;
+    padding-left: 16px;
+    padding-right: 16px;
+    border-radius: 6px;
   }
 
-  input,
-  button {
-    border: 1px none;
-    border-radius: var(--radius-3);
-    color: var(--white-1);
-    background-color: var(--panel-1);
+  .position-done-button {
+    height: fit-content;
+    margin: auto;
+    margin-left: 16px;
+    padding-left: 8px;
+    padding-right: 8px;
   }
 
-  input:focus {
-    outline: none;
-  }
 </style>
