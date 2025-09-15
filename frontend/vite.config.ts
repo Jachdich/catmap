@@ -7,5 +7,6 @@ export default defineConfig({
   base: "/catmap/",
   server: {
     allowedHosts: ["cospox.com", ".cospox.com"],
+    cors: true,
   }
 })
