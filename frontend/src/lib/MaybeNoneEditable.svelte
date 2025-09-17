@@ -3,7 +3,7 @@
         editing: boolean,
         val: string | undefined,
     }
-    let {editing, val}: Props = $props();
+    let {editing, val = $bindable() }: Props = $props();
 
     $effect(() => {
         if (val === "") {

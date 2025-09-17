@@ -2,6 +2,15 @@ import { LatLng, marker, Marker, Map, Popup } from "leaflet";
 import { cat_icon, cat_icon_sel } from "./icons";
 import { tick } from "svelte";
 
+export interface SightingData {
+    pos: LatLng;
+    who: string | undefined;
+    when: Date;
+    image_urls: string[];
+    friendliness: number | undefined;
+    notes: string | undefined;
+}
+
 export class CatSighting {
     pos: LatLng;
     who: string | undefined;
@@ -13,14 +22,7 @@ export class CatSighting {
     img_display_elem:HTMLDivElement | undefined;
     ss_pos: [number, number] = [0, 0];
 
-    constructor(data: {
-        pos: LatLng;
-        who: string | undefined;
-        when: Date;
-        image_urls: string[];
-        friendliness: number | undefined;
-        notes: string | undefined;
-    }, map: Map) {
+    constructor(data: SightingData, map: Map) {
         this.pos = data.pos;
         this.who = data.who;
         this.when = data.when;
@@ -64,6 +66,17 @@ export class CatSighting {
     }
 }
 
+export interface CatData {
+    id: number;
+    sightings: CatSighting[];
+    name: string;
+    colour: string;
+    markings: string | undefined;
+    collar: string | undefined;
+    description: string;
+    best_image: [number, number] | undefined;
+}
+
 // Kinda stupid these need to be classes. Maybe change that.
 export class Cat {
     id: number;
@@ -75,19 +88,10 @@ export class Cat {
     description: string;
     selected: boolean = false;
     best_image: [number, number] | undefined;
-    constructor(data: {
-        id: number;
-        sightings: CatSighting[];
-        name: string;
-        colour: string;
-        markings: string | undefined;
-        collar: string | undefined;
-        description: string;
-        best_image: [number, number] | undefined;
-    }) {
+    constructor(data: CatData) {
         this.id = data.id;
         this.sightings = data.sightings; 
-        this.name = data.name; 
+        this.name = data.name;
         this.colour = data.colour; 
         this.markings = data.markings; 
         this.collar = data.collar; 

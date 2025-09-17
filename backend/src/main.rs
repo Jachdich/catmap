@@ -1,11 +1,14 @@
+use std::{io::Read, str::FromStr};
+
+use mime::Mime;
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
-use tiny_http::{Method, Response, Server};
+use tiny_http::{Header, HeaderField, Method, Request, Response, Server};
 
 #[derive(Serialize, Deserialize, Debug)]
 struct CatSighting {
     pos: (f64, f64),
-    who: String,
+    who: Option<String>,
     when: u64,
     friendliness: Option<u8>,
     notes: Option<String>,
@@ -20,12 +23,12 @@ struct Cat {
     colour: String,
     markings: Option<String>,
     collar: Option<String>,
-    description: String,
+    description: Option<String>,
     best_image: Option<(u32, u32)>,
 }
 
 const SCHEMA: &'static str = r#"
-CREATE TABLE cats (
+CREATE TABLE IF NOT EXISTS cats (
     id Integer PRIMARY KEY,
     name Text NOT NULL,
     colour Text NOT NULL,
@@ -36,11 +39,11 @@ CREATE TABLE cats (
     best_image_b Integer
 );
 
-CREATE TABLE sightings (
+CREATE TABLE IF NOT EXISTS sightings (
     id Integer PRIMARY KEY,
     lat Real NOT NULL,
     long Real NOT NULL,
-    who Text NOT NULL,
+    who Text,
     whe BigInt NOT NULL,
     friendliness Integer,
     notes Text,
@@ -48,11 +51,17 @@ CREATE TABLE sightings (
     FOREIGN KEY (for_cat) REFERENCES cats(id)
 );
 
-CREATE TABLE sighting_images (
+CREATE TABLE IF NOT EXISTS sighting_images (
     for_sighting Integer,
     url Text NOT NULL,
     FOREIGN KEY (for_sighting) REFERENCES sightings(id)
 );
+
+CREATE TABLE IF NOT EXISTS images (
+    id Integer PRIMARY KEY,
+    data BLOB NOT NULL,
+    mime Text NOT NULL
+)
 "#;
 
 fn insert_cat(db: &mut Connection, cat: &Cat) -> Result<(), rusqlite::Error> {
@@ -84,6 +93,17 @@ fn insert_cat(db: &mut Connection, cat: &Cat) -> Result<(), rusqlite::Error> {
     Ok(())
 }
 
+fn insert_image(db: &mut Connection, image: &[u8], mime: &Mime) -> Result<u32, rusqlite::Error> {
+    db.prepare("INSERT INTO images (data, mime) VALUES (?1, ?2) RETURNING id")?.query_row(params![image, mime.essence_str()], |row| row.get(0))
+}
+
+fn get_image(db: &Connection, id: u32) -> Result<(Vec<u8>, Mime), rusqlite::Error> {
+    db.prepare("SELECT data, mime FROM images WHERE id = ?1")?.query_row([id], |row| {
+        let mime_str: String = row.get(1)?;
+        Ok((row.get(0)?, mime_str.parse::<Mime>().unwrap()))
+    })
+}
+
 fn get_images_for_sighting(db: &Connection, id: u32) -> Result<Vec<String>, rusqlite::Error> {
     db.prepare("SELECT * FROM sighting_images WHERE for_sighting = ?1")?
         .query_map([id], |row| row.get(1))?
@@ -111,8 +131,8 @@ fn get_cat(db: &Connection, id: u32) -> Result<Option<Cat>, rusqlite::Error> {
             let image_a: Option<u32> = row.get(6)?;
             let image_b: Option<u32> = row.get(7)?;
             let best_image = match (image_a, image_b) {
-                (None, _) => None,
-                (_, None) => None,
+                (Option::None, _) => None,
+                (_, Option::None) => None,
                 (Some(a), Some(b)) => Some((a, b)),
             };
             Ok(Cat {
@@ -129,6 +149,7 @@ fn get_cat(db: &Connection, id: u32) -> Result<Option<Cat>, rusqlite::Error> {
         .optional()
 }
 
+
 fn list_cats(db: &Connection) -> Result<Vec<u32>, rusqlite::Error> {
     db.prepare("SELECT id FROM cats")?
         .query_map([], |row| row.get(0))?
@@ -137,10 +158,11 @@ fn list_cats(db: &Connection) -> Result<Vec<u32>, rusqlite::Error> {
 
 ///
 /// GET /api/v1/cat/{id}/
-/// GET /api/v1/cat/{id}/images/img_id
-///
+/// GET /api/v1/image/img_id.extension
+/// POST /api/v1/cat
+/// POST /api/v1/image
 
-fn handle_api(mut parts: std::str::Split<'_, char>, db: &Connection) -> Result<String, u32> {
+fn handle_api(mut parts: std::str::Split<'_, char>, db: &Connection) -> Result<Response<std::io::Cursor<Vec<u8>>>, u32> {
     let Some("v1") = parts.next() else {
         return Err(404);
     };
@@ -154,13 +176,37 @@ fn handle_api(mut parts: std::str::Split<'_, char>, db: &Connection) -> Result<S
 
             let result = get_cat(db, cat_id).map_err(|_| 500u32)?;
             let cat = result.ok_or(404u32)?;
-            println!("Got cat: {:?}", cat);
 
-            serde_json::to_string(&cat).map_err(|_| 500)
+            let data = serde_json::to_string(&cat).map_err(|_| 500u32)?;
+            Ok(Response::from_string(data))
         }
         Some("list_cats") => {
             let cat_list = list_cats(db).map_err(|_| 500u32)?;
-            serde_json::to_string(&cat_list).map_err(|_| 500u32)
+            let data = serde_json::to_string(&cat_list).map_err(|_| 500u32)?;
+            Ok(Response::from_string(data))
+        }
+        Some("image") => {
+            let Some(image_name) = parts.next() else {
+                println!("No image name");
+                return Err(404);
+            };
+
+            let Some((image_id, image_format)) = image_name.split_once('.') else {
+                println!("No split");
+                return Err(404);
+            };
+
+            let image_id = image_id.parse::<u32>().map_err(|e| {println!("{:?}", e); 404u32 })?;
+            let (image_data, mime) = get_image(db, image_id).map_err(|e| {println!("{:?}", e); 404u32 })?; // TODO....
+            println!("{}, {}", image_format, mime);
+            if image_format != mime.subtype() {
+                return Err(404);
+            }
+            Ok(Response::from_data(image_data).with_header(
+                format!("Content-Type: {}", mime.essence_str())
+                .parse::<Header>()
+                .unwrap(),
+            ))
         }
         Some(_) => Err(404),
         None => Err(404),
@@ -182,7 +228,7 @@ fn handle_api(mut parts: std::str::Split<'_, char>, db: &Connection) -> Result<S
 //     Ok(Response::from_file(file))
 // }
 
-fn get(url: &str, db: &Connection) -> Result<String, u32> {
+fn get(url: &str, db: &Connection) -> Result<Response<std::io::Cursor<Vec<u8>>>, u32> {
     let mut parts = url.split('/');
     parts.next();
     match parts.next() {
@@ -198,9 +244,56 @@ fn get(url: &str, db: &Connection) -> Result<String, u32> {
     }
 }
 
+fn post(request: &mut Request, db: &mut Connection) -> Result<Response<std::io::Cursor<Vec<u8>>>, u32> {
+    let url = request.url();
+    let mut parts = url.split("/");
+    parts.next();
+    parts.next();
+    parts.next();
+    match parts.next() {
+        Some("cat") => {
+            let r = request.as_reader();
+            let mut body = String::new();
+            r.read_to_string(&mut body).unwrap(); // TODO
+            let cat: Cat = serde_json::from_str(&body).unwrap();
+            insert_cat(db, &cat).unwrap();
+            Ok(Response::from_string(""))
+        },
+        Some("image") => {
+            let mime = request
+                .headers()
+                .iter()
+                .find(|header| header.field == HeaderField::from_str("Content-Type").unwrap())
+                .ok_or(400u32)?
+                .value
+                .as_str()
+                .parse::<mime::Mime>()
+                .map_err(|_| 400u32)?;
+            if mime.type_() != mime::IMAGE {
+                return Err(400);
+            }
+            // Limit to max of 1 megabyte
+            // for now, just deny the request if it doesn't have a length. idk why this would happen
+            // if request.body_length().is_none_or(|l| l > 1 * 1024 * 1024 * 1024) {
+            //     return Err(400);
+            // }
+
+            let r = request.as_reader();
+            let mut body = Vec::new();
+            r.read_to_end(&mut body).map_err(|_| 500u32)?;
+            let f_number = insert_image(db, &body, &mime).map_err(|_| 500u32)?;
+            // TODO finish this, make it not guessable...
+            // figure out how to make this website not literally a free file server
+            Ok(Response::from_string(format!("{}.{}", f_number, mime.subtype())))
+        },
+        _ => Err(404),
+    }
+}
+
 fn main() {
     let server = Server::http("0.0.0.0:8000").unwrap();
-    let mut db = rusqlite::Connection::open_in_memory().unwrap();
+    // let mut db = rusqlite::Connection::open_in_memory().unwrap();
+    let mut db = rusqlite::Connection::open("catmap.db").unwrap();
     db.execute_batch(SCHEMA).unwrap();
 
     for mut request in server.incoming_requests() {
@@ -208,20 +301,19 @@ fn main() {
             "received request! method: {:?}, url: {:?}, headers: {:?}",
             request.method(),
             request.url(),
-            request.headers()
+            // request.headers()
+            ""
         );
 
         let response = match request.method() {
             Method::Post => {
                 // create something
-                let r = request.as_reader();
-                let mut body = String::new();
-                r.read_to_string(&mut body).unwrap(); // TODO
-                let cat: Cat = serde_json::from_str(&body).unwrap();
-                insert_cat(&mut db, &cat).unwrap();
-                
-                Response::from_string("").with_status_code(200)
+                match post(&mut request, &mut db) {
+                    Ok(result) => result,
+                    Err(code) => Response::from_string("").with_status_code(code),
+                }
             }
+
             Method::Put => {
                 // update something
 
@@ -230,7 +322,7 @@ fn main() {
             Method::Get => {
                 let url = request.url();
                 match get(url, &db) {
-                    Ok(result) => Response::from_string(result),
+                    Ok(result) => result,
                     Err(code) => Response::from_string("").with_status_code(code),
                 }
             }
