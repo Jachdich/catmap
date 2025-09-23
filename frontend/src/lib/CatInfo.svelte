@@ -5,8 +5,9 @@
         cat: Cat,
         clicked: () => void,
         showmore: () => void,
+        seen_dist: number | undefined,
     }
-    let { cat, clicked, showmore }: Props = $props();
+    let { cat, clicked, showmore, seen_dist=undefined }: Props = $props();
 
     let border = $derived(cat.selected ? "border: 2px solid white;" : "border: 2px solid #444444;");
     $effect(() => console.log(cat.selected));
@@ -42,6 +43,9 @@
         <p>Description: {cat.description}</p>
         <p>Friendliness: {cat.friendliness() === undefined ? "Unknown" : `${cat.friendliness()} (${cat.friendliness_desc()})`}</p>
         <p>Sightings: {cat.sightings.length}</p>﻿﻿
+        {#if seen_dist !== undefined}
+            <p>Seen: {seen_dist}m away</p>
+        {/if}
     </div>﻿
     <button type="button" onclick={more}>More</button>
 </div>

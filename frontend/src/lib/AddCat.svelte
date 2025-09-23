@@ -1,9 +1,8 @@
 <script lang="ts">
-    import { map, latLng, tileLayer, type MapOptions, Map, Util, type LeafletMouseEvent, LatLng, Popup, marker, Marker } from "leaflet";
-    import SightingImages from "./SightingImages.svelte";
+    import { Map, type LeafletMouseEvent, LatLng, marker, Marker } from "leaflet";
     import MaybeNoneEditable from "./MaybeNoneEditable.svelte";
     import Cropper from "svelte-easy-crop";
-    import { CatSighting, Cat, type CatData, type SightingData } from "./cat";
+    import { CatSighting, Cat, type CatData, type SightingData, sighting_to_json } from "./cat";
     import CatInfo from "./CatInfo.svelte";
     import { cat_icon_sel } from "./icons";
 
@@ -23,7 +22,7 @@
     let crop_show = $state(false);
     let add_cat_pos: LatLng | undefined = $state(undefined);
     let add_cat_popup: Marker | undefined = undefined;
-    let nearby_cats: Cat[] = $state([]);
+    let nearby_cats: [Cat, number][] = $state([]);
     let new_cat_data: CatData | undefined = $state(undefined);
     let new_sighting_data: SightingData | undefined = $state(undefined);
     let image_files: FileList | undefined = $state(undefined);
@@ -36,6 +35,7 @@
     let zoom = $state(1);
     let crop_image: string | undefined = $state(undefined);
     let crop_area: CropArea = {x: 0, y: 0, width: 0, height: 0};
+    let show_dim_bg: boolean = $derived.by(() => (state_ === "CheckNearby" || state_ === "AddSighting" || state_ === "NewCat") && !crop_show)
 
     mouse_event = function(e: LeafletMouseEvent) {
         if (state_ == "Position") {
@@ -56,11 +56,17 @@
         for (const cat of cats) {
             for (const sighting of cat.sightings) {
                 if (sighting.pos.distanceTo(pos) < 1000) {
-                    nearby_cats.push(cat);
+                    let min_dist = Math.min(...cat.sightings.map(s => s.pos.distanceTo(pos)));
+                    nearby_cats.push([cat, min_dist]);
                     break;
                 }
             }
         }
+        nearby_cats.sort((a, b) => {
+            let a_min_dist = a[1];
+            let b_min_dist = b[1];
+            return a_min_dist - b_min_dist;
+        });
         // Skip if there are no nearby cats
         if (nearby_cats.length == 0) {
             add_new_cat();
@@ -75,6 +81,8 @@
             add_cat_popup.remove();
             add_cat_popup = undefined;
         }
+        new_cat_data = undefined;
+        new_sighting_data = undefined;
     }
 
     function add_new_cat() {
@@ -117,20 +125,49 @@
 
         let sighting_images = [];
         for (const blob of cropped_images) {
-            let response = await fetch("http://localhost/api/v1/image", {
+            let response = await fetch("/api/v1/image", {
                 method: "POST",
                 headers: {"Content-Type": blob.type },
                 body: blob,
             });
             let fname = await response.text();
-            sighting_images.push(`http://localhost/api/v1/image/${fname}`);
+            sighting_images.push(`${fname}`);
         }
         new_sighting_data.image_urls = sighting_images;
 
         new_cat_data.sightings = [new CatSighting(new_sighting_data, mymap)];
         let cat = new Cat(new_cat_data);
         let json = cat.to_json();
-        await fetch("http://localhost/api/v1/cat", {
+        await fetch("/api/v1/cat", {
+          method: "POST",
+          body: JSON.stringify(json),
+          headers: {
+            "Content-type": "application/json; charset=UTF-8"
+          }
+        });
+        onadded();
+        cancel_add_cat();
+
+        image_files = undefined;
+    }
+
+    async function actually_add_sighting() {
+        if (new_sighting_data === undefined || new_cat_data === undefined) return;
+
+        let sighting_images = [];
+        for (const blob of cropped_images) {
+            let response = await fetch("/api/v1/image", {
+                method: "POST",
+                headers: {"Content-Type": blob.type },
+                body: blob,
+            });
+            let fname = await response.text();
+            sighting_images.push(`${fname}`);
+        }
+        new_sighting_data.image_urls = sighting_images;
+
+        let json = sighting_to_json(new_sighting_data);
+        await fetch(`/api/v1/cat/${new_cat_data.id}/sightings`, {
           method: "POST",
           body: JSON.stringify(json),
           headers: {
@@ -162,11 +199,11 @@
         })
     }
 
-    function get_crop(url: string): Promise<CropArea> {
+    function get_crop(url: string): Promise<CropArea | undefined> {
         crop_image = url;
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve, _) => {
             crop_done = resolve;
-            crop_discard = reject;
+            crop_discard = () => resolve(undefined);
         })
     }
 
@@ -193,14 +230,17 @@
             const url = await readFile(f);
             if (url == null) continue;
             const crop_area = await get_crop(url);
+            if (crop_area === undefined) {
+                continue;
+            }
             const img = new Image();
             await set_image_url(img, url);
             const canvas = document.createElement("canvas");
-            canvas.width = 256;
-            canvas.height = 256;
+            canvas.width = Math.min(crop_area.width, 1280); // Limit the size to something sensible
+            canvas.height = Math.min(crop_area.height, 1280);
             const ctx = canvas.getContext("2d");
             if (!ctx) return []; // this shouldn't happen ???
-            ctx.drawImage(img, crop_area.x, crop_area.y, crop_area.width, crop_area.height, 0, 0, 256, 256);
+            ctx.drawImage(img, crop_area.x, crop_area.y, crop_area.width, crop_area.height, 0, 0, canvas.width, canvas.height);
             const blob = await canvas_to_blob(canvas);
             if (blob !== null)
                 blobs.push(blob);
@@ -209,7 +249,22 @@
         cropped_images = blobs;
     }
 
+    function add_sighting(cat: Cat) {
+        state_ = "AddSighting";
+        new_cat_data = cat; // hmmm
+
+        new_sighting_data = {
+            pos: add_cat_pos as LatLng, // Should exist by now
+            who: undefined,
+            when: new Date(),
+            image_urls: [],
+            friendliness: undefined,
+            notes: undefined,
+        };
+    }
+
 </script>
+
 
 {#if crop_show}
 <div id="crop-container">
@@ -245,7 +300,7 @@
       <h2 id="title">Are any of these your car?</h2>
       <p id="subtitle">Check nearby cats in case your cat has already been seen</p>
       {#each nearby_cats as cat}
-        <CatInfo {cat} clicked={function() {}} showmore={() => {more_info = cat}}/> 
+        <CatInfo cat={cat[0]} clicked={() => add_sighting(cat[0])} seen_dist={cat[1]} showmore={() => {more_info = cat}}/> 
       {/each}
     </div>
     <div class="bottom-buttons">
@@ -253,6 +308,38 @@
       <button type="button" class="button-expand-width" onclick={cancel_add_cat}>Cancel</button>
     </div>
   </div>
+{/if}
+
+{#if state_ == "AddSighting" && new_sighting_data !== undefined && new_cat_data !== undefined}
+    <form id="new-cat" class="popup centre-window">
+        <!--<h2>Name<sup>*</sup></h2>
+        <MaybeNoneEditable editing={true} bind:val={new_cat_data.name} />
+        <h2>Colour<sup>*</sup></h2>
+        <MaybeNoneEditable editing={true} bind:val={new_cat_data.colour} />
+        <h2>Distinctive Markings</h2>
+        <MaybeNoneEditable editing={true} bind:val={new_cat_data.markings} />
+        <h2>Collar</h2>
+        <MaybeNoneEditable editing={true} bind:val={new_cat_data.collar} />
+        <h2>Description</h2>
+        <MaybeNoneEditable editing={true} bind:val={new_cat_data.description} />-->
+        <h1>{new_cat_data.name}</h1>
+        <h2>Friendliness</h2>
+        <input oninput={(e) => validate_friendliness(e.currentTarget)} />
+        <h2>Date seen</h2>
+        <input type="date" value={new_sighting_data.when.toISOString().slice(0,10)} oninput={(event: Event & { currentTarget: EventTarget & HTMLInputElement }) => {
+            if (new_sighting_data) new_sighting_data.when = new Date(event.currentTarget.value)
+        }} />
+        <h2>Sighting notes</h2>
+        <MaybeNoneEditable editing={true} bind:val={new_sighting_data.notes} />
+        <h2>Who saw it?</h2>
+        <MaybeNoneEditable editing={true} bind:val={new_sighting_data.who} />
+        <h2>Pictures</h2>
+        <input type="file" multiple bind:files={image_files} onchange={crop_images}/>
+        <div class="bottom-buttons">
+            <button type="button" class="button-expand-width" onclick={actually_add_sighting}>Submit</button>
+            <button type="button" class="button-expand-width" onclick={cancel_add_cat}>Cancel</button>
+        </div>
+    </form>
 {/if}
 
 {#if state_ == "NewCat" && new_cat_data !== undefined && new_sighting_data !== undefined}
@@ -286,16 +373,35 @@
     </form>
 {/if}
 
+{#if show_dim_bg}
+    <div class="dim-bg"></div>
+{/if}
+
 <style>
     h2 {
         font-size: 14px;
     }
 
+    h1 {
+        font-size: 18px;
+        margin: 0px auto;
+    }
+
+    .dim-bg {
+        background-color: #00000080;
+        position: absolute;
+        z-index: 2;
+        width: 100%;
+        height: 100%;
+        top: 0;
+        left: 0;
+    }
+
   #crop-container {
     position: absolute;
-    z-index: 30;
-    width: 80%;
-    height: 80%;
+    z-index: 5;
+    width: 100%;
+    height: 100%;
     left: 50%;
     right: 50%;
     top: 50%;
@@ -349,7 +455,7 @@
   }
 
   .top-done-buttons {
-    z-index: 9;
+    z-index: 6;
     position: absolute;
     top: 16px;
     left: 50%;

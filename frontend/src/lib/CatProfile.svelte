@@ -26,7 +26,7 @@
             <h2>Friendliness</h2>
             <p>{cat.friendliness() === undefined ? "Unknown" : `${cat.friendliness()} (${cat.friendliness_desc()})`}</p>
 
-            <button onclick={() => editing = !editing}>Edit</button>
+            <button onclick={() => editing = !editing}>{#if editing}Done{:else}Edit{/if}</button>
         </div>
         <div id="right-content">
             {#each cat.sightings as s}

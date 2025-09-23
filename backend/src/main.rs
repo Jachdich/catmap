@@ -64,6 +64,22 @@ CREATE TABLE IF NOT EXISTS images (
 )
 "#;
 
+fn insert_sightings(db: &Connection, sightings: &[CatSighting], cat_id: u32) -> Result<(), rusqlite::Error> {
+    let mut sighting_smt = 
+        db.prepare("INSERT INTO sightings (lat, long, who, whe, friendliness, notes, for_cat) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7) RETURNING id")?;
+    let mut url_smt = db.prepare("INSERT INTO sighting_images (for_sighting, url) VALUES (?1, ?2)")?;
+    for sighting in sightings {
+        let sighting_id: u32 = sighting_smt.query_row(params![sighting.pos.0, sighting.pos.1, sighting.who, sighting.when, sighting.friendliness, sighting.notes, cat_id],
+            |row| row.get(0))?;
+
+        for url in &sighting.image_urls {
+            url_smt.execute(params![sighting_id, url])?;
+        }
+    }
+
+    Ok(())
+}
+
 fn insert_cat(db: &mut Connection, cat: &Cat) -> Result<(), rusqlite::Error> {
     println!("Inserting cat: {:?}", cat);
     let (best_image_a, best_image_b) = match cat.best_image {
@@ -74,20 +90,7 @@ fn insert_cat(db: &mut Connection, cat: &Cat) -> Result<(), rusqlite::Error> {
     let cat_id: u32 = tx.prepare("INSERT INTO cats (name, colour, markings, collar, description, best_image_a, best_image_b) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7) RETURNING id")?
         .query_row(params![cat.name, cat.colour, cat.markings, cat.collar, cat.description, best_image_a, best_image_b], |row| row.get(0))?;
 
-    let mut sighting_smt = 
-        tx.prepare("INSERT INTO sightings (lat, long, who, whe, friendliness, notes, for_cat) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7) RETURNING id")?;
-    let mut url_smt = tx.prepare("INSERT INTO sighting_images (for_sighting, url) VALUES (?1, ?2)")?;
-    for sighting in &cat.sightings {
-        let sighting_id: u32 = sighting_smt.query_row(params![sighting.pos.0, sighting.pos.1, sighting.who, sighting.when, sighting.friendliness, sighting.notes, cat_id],
-            |row| row.get(0))?;
-
-        for url in &sighting.image_urls {
-            url_smt.execute(params![sighting_id, url])?;
-        }
-    }
-
-    drop(sighting_smt);
-    drop(url_smt);
+    insert_sightings(&tx, &cat.sightings, cat_id)?;
 
     tx.commit()?;
     Ok(())
@@ -162,16 +165,9 @@ fn list_cats(db: &Connection) -> Result<Vec<u32>, rusqlite::Error> {
 /// POST /api/v1/cat
 /// POST /api/v1/image
 
-fn handle_api(mut parts: std::str::Split<'_, char>, db: &Connection) -> Result<Response<std::io::Cursor<Vec<u8>>>, u32> {
-    let Some("v1") = parts.next() else {
-        return Err(404);
-    };
-    match parts.next() {
-        Some("cat") => {
-            let Some(cat_id) = parts.next() else {
-                return Err(404);
-            };
-
+fn handle_api(path: &[&str], db: &Connection) -> Result<Response<std::io::Cursor<Vec<u8>>>, u32> {
+    match path {
+        ["v1", "cat", cat_id] => {
             let cat_id = cat_id.parse::<u32>().map_err(|_| 404u32)?;
 
             let result = get_cat(db, cat_id).map_err(|_| 500u32)?;
@@ -180,17 +176,12 @@ fn handle_api(mut parts: std::str::Split<'_, char>, db: &Connection) -> Result<R
             let data = serde_json::to_string(&cat).map_err(|_| 500u32)?;
             Ok(Response::from_string(data))
         }
-        Some("list_cats") => {
+        ["v1", "list_cats"] => {
             let cat_list = list_cats(db).map_err(|_| 500u32)?;
             let data = serde_json::to_string(&cat_list).map_err(|_| 500u32)?;
             Ok(Response::from_string(data))
         }
-        Some("image") => {
-            let Some(image_name) = parts.next() else {
-                println!("No image name");
-                return Err(404);
-            };
-
+        ["v1", "image", image_name] => {
             let Some((image_id, image_format)) = image_name.split_once('.') else {
                 println!("No split");
                 return Err(404);
@@ -208,8 +199,7 @@ fn handle_api(mut parts: std::str::Split<'_, char>, db: &Connection) -> Result<R
                 .unwrap(),
             ))
         }
-        Some(_) => Err(404),
-        None => Err(404),
+        _ => Err(404),
     }
 }
 
@@ -231,8 +221,9 @@ fn handle_api(mut parts: std::str::Split<'_, char>, db: &Connection) -> Result<R
 fn get(url: &str, db: &Connection) -> Result<Response<std::io::Cursor<Vec<u8>>>, u32> {
     let mut parts = url.split('/');
     parts.next();
-    match parts.next() {
-        Some("api") => handle_api(parts, db),
+    let path: Vec<_> = parts.collect();
+    match path.as_slice() {
+        ["api", rest @ ..] => handle_api(rest, db),
         // Some(path) => {
         //     let mut path = vec![path];
         //     path.extend(parts);
@@ -248,18 +239,24 @@ fn post(request: &mut Request, db: &mut Connection) -> Result<Response<std::io::
     let url = request.url();
     let mut parts = url.split("/");
     parts.next();
-    parts.next();
-    parts.next();
-    match parts.next() {
-        Some("cat") => {
-            let r = request.as_reader();
+    let path: Vec<_> = parts.collect();
+    match path.as_slice() {
+        ["api", "v1", "cat", cat_id, "sightings"] => {
+            let cat_id = cat_id.parse::<u32>().map_err(|_| 404u32)?;
             let mut body = String::new();
-            r.read_to_string(&mut body).unwrap(); // TODO
+            request.as_reader().read_to_string(&mut body).unwrap();
+            let sighting: CatSighting = serde_json::from_str(&body).unwrap();
+            insert_sightings(db, &[sighting], cat_id).unwrap();
+            Ok(Response::from_string(""))
+        },
+        ["api", "v1", "cat"] => {
+            let mut body = String::new();
+            request.as_reader().read_to_string(&mut body).unwrap();
             let cat: Cat = serde_json::from_str(&body).unwrap();
             insert_cat(db, &cat).unwrap();
             Ok(Response::from_string(""))
         },
-        Some("image") => {
+        ["api", "v1", "image"] => {
             let mime = request
                 .headers()
                 .iter()
@@ -284,7 +281,7 @@ fn post(request: &mut Request, db: &mut Connection) -> Result<Response<std::io::
             let f_number = insert_image(db, &body, &mime).map_err(|_| 500u32)?;
             // TODO finish this, make it not guessable...
             // figure out how to make this website not literally a free file server
-            Ok(Response::from_string(format!("{}.{}", f_number, mime.subtype())))
+            Ok(Response::from_string(format!("/api/v1/image/{}.{}", f_number, mime.subtype())))
         },
         _ => Err(404),
     }

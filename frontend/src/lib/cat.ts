@@ -19,7 +19,7 @@ export class CatSighting {
     notes: string | undefined;
     image_urls: string[];
     marker: Marker;
-    img_display_elem:HTMLDivElement | undefined;
+    img_display_elem: HTMLDivElement | undefined;
     ss_pos: [number, number] = [0, 0];
 
     constructor(data: SightingData, map: Map) {
@@ -46,23 +46,27 @@ export class CatSighting {
     static from_json(json: any, map: Map): CatSighting {
         return new CatSighting ({
             pos: new LatLng(json["pos"][0], json["pos"][1]),
-            who: json["who"],
+            who: null_to_undefined(json["who"]),
             when: new Date(json["when"]),
             image_urls: json["image_urls"],
-            friendliness: json["friendliness"],
-            notes: json["notes"],
+            friendliness: null_to_undefined(json["friendliness"]),
+            notes: null_to_undefined(json["notes"]),
         }, map)
     }
 
     to_json(): any {
-        return {
-            pos: [this.pos.lat, this.pos.lng],
-            who: this.who,
-            when: Math.round(this.when.getTime() / 1000.0), // unix time ???
-            image_urls: this.image_urls,
-            friendliness: this.friendliness,
-            notes: this.notes,
-        }
+        return sighting_to_json(this);
+    }
+}
+
+export function sighting_to_json(sighting: SightingData): any {
+    return {
+        pos: [sighting.pos.lat, sighting.pos.lng],
+        who: sighting.who,
+        when: Math.round(sighting.when.getTime() / 1000.0), // unix time ???
+        image_urls: sighting.image_urls,
+        friendliness: sighting.friendliness,
+        notes: sighting.notes,
     }
 }
 
@@ -73,11 +77,22 @@ export interface CatData {
     colour: string;
     markings: string | undefined;
     collar: string | undefined;
-    description: string;
+    description: string | undefined;
     best_image: [number, number] | undefined;
 }
 
+function empty_to_undefined(s: string | undefined | null): string | undefined {
+    if (s === undefined || s === null || s.trim() === "") return undefined;
+    return s;
+}
+
+function null_to_undefined(x: any | null | undefined): any | undefined {
+    if (x === null) return undefined;
+    return x;
+}
+
 // Kinda stupid these need to be classes. Maybe change that.
+// made stupider for the fact we need an interface too
 export class Cat {
     id: number;
     sightings: CatSighting[];
@@ -85,7 +100,7 @@ export class Cat {
     colour: string;
     markings: string | undefined;
     collar: string | undefined;
-    description: string;
+    description: string | undefined;
     selected: boolean = false;
     best_image: [number, number] | undefined;
     constructor(data: CatData) {
@@ -93,8 +108,8 @@ export class Cat {
         this.sightings = data.sightings; 
         this.name = data.name;
         this.colour = data.colour; 
-        this.markings = data.markings; 
-        this.collar = data.collar; 
+        this.markings = empty_to_undefined(data.markings);
+        this.collar = empty_to_undefined(data.collar);
         this.description = data.description; 
         this.best_image = data.best_image;
 
@@ -110,10 +125,10 @@ export class Cat {
             sightings: json["sightings"].map((sighting_json: any) => CatSighting.from_json(sighting_json, map)),
             name: json["name"],
             colour: json["colour"],
-            markings: json["markings"],
-            collar: json["collar"],
-            description: json["description"],
-            best_image: json["best_image"],
+            markings: null_to_undefined(json["markings"]),
+            collar: null_to_undefined(json["collar"]),
+            description: empty_to_undefined(json["description"]),
+            best_image: null_to_undefined(json["best_image"]),
         })
     }
 

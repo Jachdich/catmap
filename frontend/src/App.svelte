@@ -30,7 +30,7 @@
     import AddCat from "./lib/AddCat.svelte";
 
     async function get_all_cats(): Promise<Cat[]> {
-        const url = "http://localhost/api/v1/list_cats";
+        const url = "/api/v1/list_cats";
         const result = await fetch(url);
         const json: any[] = await result.json();
         let cats = [];
@@ -51,7 +51,7 @@
     }
 
     async function get_cat(id: number): Promise<Cat | undefined> {
-        const url = `http://localhost/api/v1/cat/${id}`;
+        const url = `/api/v1/cat/${id}`;
         const result = await fetch(url);
         const json = await result.json();
 
