@@ -127,6 +127,19 @@
     // }
     let adding_new_cat: boolean = $state(false);
     let add_cat_click_callback: ((e: LeafletMouseEvent) => void) = $state((_) => undefined);
+
+
+    async function cat_edited(cat: Cat) {
+        let json = cat.to_json();
+        json["sightings"] = []; // we're not editing the sightings
+        await fetch(`/api/v1/cat/${cat.id}`, {
+          method: "PUT",
+          body: JSON.stringify(json),
+          headers: {
+            "Content-type": "application/json; charset=UTF-8"
+          }
+        });
+    }
 </script>
 
 <div id="root">
@@ -157,7 +170,7 @@
 
 
 {#if more_info !== undefined}
-  <CatProfile cat={more_info} close={() => more_info = undefined} />
+  <CatProfile cat={more_info} close={() => more_info = undefined} edited={cat_edited} />
 {/if}
 
 <style>

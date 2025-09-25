@@ -5,9 +5,28 @@
     interface Props {
         cat: Cat;
         close: () => void;
+        edited: (cat: Cat) => void;
     }
-    let { cat, close } : Props = $props();
+    let { cat, close, edited } : Props = $props();
     let editing = $state(false);
+
+    function edit() {
+        editing = !editing;
+        if (!editing) {
+            edited(cat);
+        }
+    }
+
+    // hack
+    let colour: string = $state(cat.colour);
+    let markings: string | undefined = $state(cat.markings);
+    let collar: string | undefined = $state(cat.collar);
+    let description: string | undefined = $state(cat.description);
+
+    $effect(() => { cat.colour = colour });
+    $effect(() => { cat.markings = markings });
+    $effect(() => { cat.collar = collar });
+    $effect(() => { cat.description = description });
 </script>
 
 <div id="main" class="popup centre-window">
@@ -16,17 +35,17 @@
         <div id="left-content">
             <h1>{cat.name}</h1>
             <h2>Colour</h2>
-            <MaybeNoneEditable editing={editing} val={cat.colour} />
+            <MaybeNoneEditable editing={editing} bind:val={colour} />
             <h2>Distinctive Markings</h2>
-            <MaybeNoneEditable editing={editing} val={cat.markings} />
+            <MaybeNoneEditable editing={editing} bind:val={markings} />
             <h2>Collar</h2>
-            <MaybeNoneEditable editing={editing} val={cat.collar} />
+            <MaybeNoneEditable editing={editing} bind:val={collar} />
             <h2>Description</h2>
-            <MaybeNoneEditable editing={editing} val={cat.description} />
+            <MaybeNoneEditable editing={editing} bind:val={description} />
             <h2>Friendliness</h2>
             <p>{cat.friendliness() === undefined ? "Unknown" : `${cat.friendliness()} (${cat.friendliness_desc()})`}</p>
 
-            <button onclick={() => editing = !editing}>{#if editing}Done{:else}Edit{/if}</button>
+            <button onclick={edit}>{#if editing}Done{:else}Edit{/if}</button>
         </div>
         <div id="right-content">
             {#each cat.sightings as s}
