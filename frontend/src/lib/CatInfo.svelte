@@ -44,7 +44,7 @@
         <p>Friendliness: {cat.friendliness() === undefined ? "Unknown" : `${cat.friendliness()} (${cat.friendliness_desc()})`}</p>
         <p>Sightings: {cat.sightings.length}</p>﻿﻿
         {#if seen_dist !== undefined}
-            <p>Seen: {seen_dist}m away</p>
+            <p>Seen: {Math.round(seen_dist)}m away</p>
         {/if}
     </div>﻿
     <button type="button" onclick={more}>More</button>

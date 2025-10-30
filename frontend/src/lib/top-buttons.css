@@ -1,0 +1,21 @@
+.top-buttons-container {
+  z-index: 6;
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translate(-50%, 0);
+  background-color: var(--panel-0);
+  display: flex;
+  flex-direction: row;
+  padding-left: 16px;
+  padding-right: 16px;
+  border-radius: 6px;
+}
+
+.top-button {
+  height: fit-content;
+  margin: auto;
+  margin-left: 16px;
+  padding-left: 8px;
+  padding-right: 8px;
+}

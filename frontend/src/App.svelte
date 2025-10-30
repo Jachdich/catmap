@@ -16,6 +16,10 @@
     //     - if no, add new car + sighting at once
     //     - if yes, just add new sighting to exsiting car
     //
+    //
+    // Show preview of cropped images in "new cat" screen
+    // Bug: some kind of effect loop involving CheckNearby
+    // 
     // TODO code
     // switch to own OSM tile source (or, realistically in the short term, credit the one I am using)
 
@@ -26,7 +30,6 @@
     import CatProfile from "./lib/CatProfile.svelte";
     import { Cat } from "./lib/cat";
     import "./lib/popup.css";
-    import { cat_icon_sel } from "./lib/icons";
     import AddCat from "./lib/AddCat.svelte";
 
     async function get_all_cats(): Promise<Cat[]> {
@@ -99,7 +102,9 @@
                 selected_cat = undefined;
             }
 
-            add_cat_click_callback(e);
+            if (adding_new_cat) {
+                add_cat_click_callback(e);
+            }
         });
         get_all_cats().then(fetched_cats => {
             cats = fetched_cats;
