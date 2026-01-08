@@ -9,11 +9,18 @@
     }
     let { cat, close, edited } : Props = $props();
     let editing = $state(false);
+    let original: any | undefined = undefined;
 
     function edit() {
         editing = !editing;
         if (!editing) {
-            edited(cat);
+            // ugh, this is hacky
+            if (JSON.stringify(cat.to_json()) != JSON.stringify(original)) {
+                edited(cat);
+            }
+        }
+        if (editing) {
+            original = cat.to_json();
         }
     }
 

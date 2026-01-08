@@ -1,13 +1,6 @@
 <script lang="ts">
     import Cropper from "svelte-easy-crop";
     import "./top-buttons.css";
-
-    interface Props {
-        files: FileList,
-        oncropcomplete: (images: Blob[]) => void,
-    }
-
-    let { files, oncropcomplete }: Props = $props();
     
     interface CropArea { x: number, y: number, width: number, height: number };
 
@@ -18,10 +11,7 @@
     let zoom = $state(1);
     let crop_image: string | undefined = $state(undefined);
     let crop_area: CropArea = {x: 0, y: 0, width: 0, height: 0};
-
-    $effect(() => {
-        crop_images(files).then((blobs) => oncropcomplete(blobs));
-    });
+    let crop_show = $state(false);
 
     function readFile(file: File): Promise<string> {
         return new Promise((resolve, reject) => {
@@ -34,9 +24,16 @@
 
     function get_crop(url: string): Promise<CropArea | undefined> {
         crop_image = url;
+        crop_show = true;
         return new Promise((resolve, _) => {
-            crop_done = resolve;
-            crop_discard = () => resolve(undefined);
+            crop_done = (f) => {
+                crop_show = false;
+                resolve(f);
+            }
+            crop_discard = () => {
+                crop_show = false;
+                resolve(undefined);
+            }
         })
     }
 
@@ -55,7 +52,7 @@
         })
     }
 
-    async function crop_images(image_files: FileList): Promise<Blob[]> {
+    export async function crop_images(image_files: FileList): Promise<Blob[]> {
         if (image_files === undefined) return [];
         const blobs: Blob[] = [];
         for (const f of image_files) {
@@ -82,32 +79,33 @@
     }
 </script>
 
+{#if crop_show}
+    <div id="crop-container">
+        <Cropper
+            image={crop_image}
+            bind:crop
+            bind:zoom
+            aspect={1}
+            maxZoom={10}
+            oncropcomplete={e => {
+                crop_area = e.pixels;
+            }}
+        />
+    </div>
 
-<div id="crop-container">
-<Cropper
-    image={crop_image}
-    bind:crop
-    bind:zoom
-    aspect={1}
-    maxZoom={10}
-    oncropcomplete={e => {
-        crop_area = e.pixels;
-    }}
-/>
-</div>
-
-<div class="top-buttons-container">
-  <p>Crop the image</p>
-  <button type="button" class="top-button" onclick={() => { if (crop_done !== undefined) crop_done(crop_area); } }>Done</button>
-  <button type="button" class="top-button" onclick={() => { if (crop_discard !== undefined) crop_discard(); } }>Cancel</button>
-</div>
+    <div class="top-buttons-container">
+      <p>Crop the image</p>
+      <button type="button" class="top-button" onclick={() => { if (crop_done !== undefined) crop_done(crop_area); } }>Done</button>
+      <button type="button" class="top-button" onclick={() => { if (crop_discard !== undefined) crop_discard(); } }>Cancel</button>
+    </div>
+{/if}
 
 <style>
   #crop-container {
-    position: absolute;
+    position: fixed;
     z-index: 5;
-    width: 100%;
-    height: 100%;
+    width: 100vw;
+    height: 100vh;
     left: 50%;
     right: 50%;
     top: 50%;

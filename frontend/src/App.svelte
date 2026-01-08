@@ -2,12 +2,8 @@
     // TODO !IMPORTANT
     // last seen
     // where people have last seen this cat, territory
-    // when adding new cat, ask "is this your car" for every cat nearby
     // edit existing cat while adding sighing?
-    // list of cats, show their sightings
     // should colour be enum or free text
-    // click on sighting, shows other sightings of same cat highlighted
-    // avg friendliness based on each sighting
     // select "front cover" photo
     //
     // + button for like "i saw a car"
@@ -17,11 +13,9 @@
     //     - if yes, just add new sighting to exsiting car
     //
     //
-    // Show preview of cropped images in "new cat" screen
-    // Bug: some kind of effect loop involving CheckNearby
+    // Bug: some kind of effect loop involving CheckNearby (think it's fixed - keep eye out)
+    // bug: error for non-image sent to cropper
     // 
-    // TODO code
-    // switch to own OSM tile source (or, realistically in the short term, credit the one I am using)
 
     import { map, latLng, tileLayer, type MapOptions, Map, type LeafletMouseEvent, marker } from "leaflet";
     import "leaflet/dist/leaflet.css";

@@ -15,11 +15,10 @@
 
     let { cats, skip, pos, onadd_sighting, onshow_more, oncancel, onadd_cat }: Props = $props();
 
-    let nearby_cats: [Cat, number][] = $state([]);
-    $effect(() => recalculate_nearby(cats));
+    let nearby_cats: [Cat, number][] = $derived.by(() => recalculate_nearby(cats));
 
     function recalculate_nearby(cats: Cat[]) {
-        nearby_cats = [];
+        let nearby_cats: [Cat, number][] = [];
         for (const cat of cats) {
             for (const sighting of cat.sightings) {
                 if (sighting.pos.distanceTo(pos) < 1000) {
@@ -38,6 +37,7 @@
         if (nearby_cats.length == 0) {
             skip();
         }
+        return nearby_cats;
     }
 
     function cancel() {

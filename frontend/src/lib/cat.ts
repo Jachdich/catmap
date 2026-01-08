@@ -154,7 +154,9 @@ export class Cat {
     select_all() {
         for (const s of this.sightings) {
             s.marker.setIcon(cat_icon_sel);
-            s.marker.openPopup();
+            if (s.image_urls.length > 0) {
+                s.marker.openPopup();
+            }
         }
         this.selected = true;
     }

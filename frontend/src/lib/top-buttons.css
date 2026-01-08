@@ -1,6 +1,6 @@
 .top-buttons-container {
   z-index: 6;
-  position: absolute;
+  position: fixed;
   top: 16px;
   left: 50%;
   transform: translate(-50%, 0);
